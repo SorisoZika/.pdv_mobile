@@ -13,6 +13,8 @@ import shutil
 import webbrowser
 import os
 import concurrent.futures
+import pyperclip
+import time
 
 # ========== CONFIGURAÇÃO ==========
 IP_INICIAL = 101
@@ -53,7 +55,7 @@ def executar_comando(ip, usuario, senha, comando): # type: ignore
         return saida if saida else erro
     except Exception as e:
         # Se o comando era de reboot, uma exceção de "Socket is closed" ou similar é esperada e normal.
-        if "reboot" in comando and isinstance(e, paramiko.ssh_exception.SSHException):
+        if "reboot" in comando and isinstance(e, paramiko.SSHException):
             return "Comando de reinicialização enviado com sucesso (a conexão foi encerrada como esperado)."
         return str(e)
 
@@ -63,7 +65,22 @@ def abrir_vnc(ip):
         if not os.path.exists(vnc_path):
             QMessageBox.critical(None, "Erro", f"VNC Viewer não encontrado em:\n{vnc_path}\nVerifique a instalação.")
             return
+
+        senha, _ = gerar_senha(ip)
+        pyperclip.copy(senha)  # Copia a senha para a área de transferência
+
+        # Abre o VNC Viewer
         subprocess.Popen([vnc_path, ip])
+
+        # Aguarda um tempo para a janela do VNC Viewer abrir
+        time.sleep(3)
+
+        # Executa o script AutoHotkey
+        try:
+            subprocess.Popen(["C:\\Program Files\\AutoHotkey\\AutoHotkey.exe", "vnc_automation.ahk"])
+        except Exception as e:
+            QMessageBox.critical(None, "Erro", f"Erro ao executar AutoHotkey: {str(e)}")
+
     except Exception as e:
         QMessageBox.critical(None, "Erro", f"Erro ao tentar abrir VNC Viewer: {str(e)}")
 
@@ -276,8 +293,8 @@ class SelecionarPDVsDialog(QDialog):
         for label, ip in self.lista_pdvs:
             cb = CheckBoxPDV(label, ip)
             cb.setFont(fonte_cb)
-            # Esses QCheckBoxes da lista continuam sem borda, conforme a sugestão
-            cb.setStyleSheet("background-color: transparent;") # Isso será sobrescrito pelo atualizar_estilo
+            # Esses QCheckBoxes da lista continuam com borda, conforme a sugestão
+            cb.setStyleSheet("background-color: transparent; border: 1px solid #777;") # Isso será sobrescrito pelo atualizar_estilo
             self.checkboxes.append(cb)
             vbox.addWidget(cb)
 
@@ -1028,7 +1045,7 @@ class PDVManager(QWidget):
         print(f"DEBUG: PDVManager.conectar called for IP: {ip}")
         senha, pdv_num = gerar_senha(ip)
         login = LoginDialog(ip, pdv_num, self)
-        print(f"DEBUG: LoginDialog instance created for IP: {ip, pdv_num}")
+        print(f"DEBUG: LoginDialog instance created for IP: {ip}")
         if login.exec_() == QDialog.Accepted:
             print(f"DEBUG: LoginDialog for {ip} returned Accepted.")
             pass
