@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de PDVs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #2c3e50; /* Azul escuro principal */
+            --card-bg-color: #34495e; /* Azul acinzentado para cards */
+            --text-color: #ecf0f1; /* Branco suave para texto */
+            --primary-blue: #3498db; /* Azul vibrante */
+            --primary-blue-light: #49a7e0; /* Azul mais claro para hover do botão */
+            --card-hover-bg: #4a627d; /* Novo: Azul acinzentado mais claro para hover do card */
+            --green-online-base: #2ecc71;
+            --green-online-dimmed: rgba(46, 204, 113, 0.7);
+            --red-offline: #e74c3c; /* Vermelho offline */
+            --gray-checking: #95a5a6; /* Cinza para "Verificando" */
+            --dark-gray-footer: #212d3b; /* Mais escuro para o footer */
+            --shadow-light: rgba(0, 0, 0, 0.2);
+            --shadow-medium: rgba(0, 0, 0, 0.3);
+            --shadow-heavy: rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+            visibility: hidden; /* Esconde o body inicialmente para a splash screen ou fade-in */
+            
+            /* ANIMAÇÃO DE ENTRADA: O body da página principal agora também fade-in */
+            opacity: 0;
+            transition: opacity 0.4s ease-out; /* Transição para entrada e saída */
+        }
+
+        /* Classe para o body fade-in após a splash screen */
+        body.fade-in-page {
+            opacity: 1;
+            visibility: visible; /* Torna o body visível */
+        }
+
+        /* ANIMAÇÃO DE SAÍDA: O body da página principal fade-out ao clicar */
+        body.fade-out-page {
+            opacity: 0;
+            transition: opacity 0.3s ease-out; /* Velocidade para a saída */
+        }
+
+        /* --- SPLASH SCREEN --- */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom right, #34495e, #2c3e50); /* Gradiente sutil */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease-out, visibility 0.5s ease-out; /* Transição mais rápida */
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .splash-icons {
+            font-size: 1.5em;
+            color: var(--primary-blue);
+            margin-bottom: 15px;
+            opacity: 0;
+            animation: splashIconAnimation 1.2s infinite alternate ease-in-out; /* Animação mais rápida */
+        }
+        .splash-icons span {
+            display: inline-block;
+            margin: 0 5px;
+        }
+        .splash-icons span:nth-child(1) { animation-delay: 0.05s; } /* Atraso menor */
+        .splash-icons span:nth-child(2) { animation-delay: 0.15s; }
+        .splash-icons span:nth-child(3) { animation-delay: 0.25s; }
+
+        .splash-logo {
+            font-size: 3em;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+            margin-bottom: 10px;
+            opacity: 0;
+            transform: scale(0.9);
+            animation: fadeInScale 0.9s ease-out forwards 0.2s; /* Animação mais rápida com atraso menor */
+        }
+
+        .splash-tagline {
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.7);
+            opacity: 0;
+            animation: fadeInUp 0.8s ease-out forwards 0.4s; /* Animação mais rápida com atraso menor */
+        }
+
+        .progress-bar-container {
+            width: 200px;
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            margin-top: 20px;
+            overflow: hidden;
+            opacity: 0;
+            animation: fadeIn 0.8s ease-out forwards 0.6s; /* Animação mais rápida */
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: var(--primary-blue);
+            border-radius: 3px;
+            animation: fillProgress 1.5s ease-out forwards 0.8s; /* Animação mais rápida */
+        }
+
+        /* --- Header --- */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, var(--card-bg-color), #4a627d);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px var(--shadow-medium);
+            position: relative;
+            animation: fadeInDown 0.9s ease-out;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.8em;
+            letter-spacing: 1.5px;
+            text-shadow: 2px 2px 5px var(--shadow-heavy);
+            font-weight: 700;
+        }
+
+        .header .btn-acesso-geral {
+            display: inline-block;
+            text-decoration: none;
+            background-color: var(--primary-blue);
+            color: white;
+            padding: 16px 30px;
+            border-radius: 35px;
+            font-weight: 600;
+            margin-top: 25px;
+            box-shadow: 0 6px 15px var(--shadow-light);
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            border: none;
+            cursor: pointer;
+        }
+
+        .header .btn-acesso-geral:hover {
+            background-color: var(--primary-blue-light); /* Cor mais clara no hover */
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 10px 20px var(--shadow-medium);
+        }
+        /* Removido o estilo .fade-out-click, agora o body cuidará do fade-out */
+        .header .btn-acesso-geral:active {
+            transform: translateY(0) scale(0.98);
+            transition: transform 0.1s ease-out; /* Transição muito rápida só para o active */
+        }
+
+
+        /* --- Container dos Cards PDV --- */
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 25px;
+            flex-grow: 1;
+            padding-bottom: 40px;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* --- Card PDV --- */
+        .pdv-card {
+            background-color: var(--card-bg-color);
+            border-radius: 12px;
+            padding: 30px;
+            text-decoration: none;
+            color: var(--text-color);
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2), 0 10px 25px rgba(0, 0, 0, 0.15);
+            /* Transição para o HOVER (apenas background-color e transform) */
+            transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            /* Estilos padrão (sem animação, visível) */
+            opacity: 1; /* Garante que os cards estejam visíveis por padrão */
+            transform: translateY(0); /* Posição inicial sem translate */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+        }
+
+        /* Classe para aplicar a animação SÓ NA PRIMEIRA VEZ */
+        .pdv-card.animate-in {
+            opacity: 0; /* Começa invisível para animar */
+            transform: translateY(25px); /* Começa de baixo para animar */
+            animation-fill-mode: forwards;
+        }
+
+
+        .pdv-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+            box-shadow: inset 0 0 0 0 rgba(0,0,0,0);
+            transition: box-shadow 0.5s ease;
+            pointer-events: none;
+        }
+
+        .pdv-card:hover {
+            background-color: var(--card-hover-bg); /* Cor de realce no hover */
+            transform: scale(1.03) translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 15px 40px rgba(0, 0, 0, 0.25);
+        }
+
+        .pdv-card:active {
+            transform: scale(0.97) translateY(0); /* Apenas encolhe */
+            box-shadow: 0 4px 10px var(--shadow-light);
+            transition: transform 0.1s ease-out; /* Transição muito rápida só para o active */
+        }
+
+
+        /* --- Estilos de Status --- */
+        .pdv-card.checking {
+            background-color: var(--gray-checking);
+            box-shadow: 0 6px 20px rgba(149, 165, 166, 0.3);
+        }
+        .pdv-card.checking .status {
+            animation: pulse 1.8s infinite alternate ease-in-out;
+            color: #fff;
+        }
+
+        .pdv-card.online {
+            background-color: var(--green-online-dimmed); /* Verde original, mas com opacidade */
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4); /* Sombra verde */
+        }
+        .pdv-card.online::before {
+            box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .pdv-card.offline {
+            background-color: var(--red-offline);
+            opacity: 0.75;
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+        }
+        .pdv-card.offline::before {
+            box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .pdv-card .label {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            display: block;
+            font-weight: 700;
+            color: #fff;
+        }
+        .pdv-card .status {
+            font-size: 1em;
+            font-weight: 400;
+            display: block;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* --- Dashboard Insights (Agora abaixo da lista de PDVs) --- */
+        .dashboard-insights {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 40px; /* Espaço acima do insights (depois da lista) */
+            margin-bottom: 40px; /* Espaço antes do footer */
+            flex-wrap: wrap; /* Permite que os itens quebrem a linha */
+            animation: fadeInUp 1s ease-out forwards 0.2s; /* Animação para a seção de insights */
+        }
+
+        .insight-card {
+            background-color: var(--card-bg-color);
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px var(--shadow-light);
+            text-align: center;
+            min-width: 150px;
+            flex: 1; /* Permite que os cards cresçam */
+            max-width: 250px; /* Limita o tamanho em telas grandes */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .insight-card .count {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 5px;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .insight-card .label {
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* --- Rodapé --- */
+        .footer {
+            margin-top: auto;
+            padding-top: 30px;
+            padding-bottom: 15px;
+            text-align: center;
+            font-size: 0.9em;
+            color: rgba(236, 240, 241, 0.7);
+            border-top: 1px solid rgba(236, 240, 241, 0.15);
+            background-color: var(--dark-gray-footer);
+            width: 100%;
+            box-shadow: 0 -5px 15px var(--shadow-light);
+        }
+
+        /* --- Keyframe Animations --- */
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.03); opacity: 0.9; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fillProgress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+
+        @keyframes splashIconAnimation {
+            0% { opacity: 0.5; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-10px); }
+            100% { opacity: 0.5; transform: translateY(0); }
+        }
+
+
+        /* --- Responsividade Otimizada --- */
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+                gap: 20px;
+            }
+            .header h1 {
+                font-size: 2.5em;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            .header {
+                padding: 20px;
+                margin-bottom: 30px;
+            }
+            .header h1 {
+                font-size: 2.2em;
+            }
+            .header .btn-acesso-geral {
+                padding: 14px 25px;
+            }
+            .dashboard-insights {
+                flex-direction: column; /* Em mobile, insights podem ficar em coluna */
+                gap: 15px;
+                margin-top: 30px; /* Ajustado para mobile */
+                margin-bottom: 30px;
+            }
+            .insight-card {
+                max-width: 100%; /* Ocupa a largura total em mobile */
+            }
+            .container {
+                grid-template-columns: repeat(2, minmax(140px, 1fr));
+                gap: 18px;
+            }
+            .pdv-card {
+                padding: 25px;
+            }
+            .pdv-card .label {
+                font-size: 1.3em;
+            }
+            .pdv-card .status {
+                font-size: 0.9em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+            .header {
+                padding: 15px;
+                margin-bottom: 25px;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .header .btn-acesso-geral {
+                padding: 12px 20px;
+                font-size: 0.9em;
+                margin-top: 15px;
+            }
+            .dashboard-insights {
+                margin-top: 25px; /* Ajustado para mobile */
+                margin-bottom: 25px;
+            }
+            .container {
+                grid-template-columns: repeat(2, minmax(130px, 1fr));
+                gap: 15px;
+                padding-bottom: 20px;
+            }
+            .pdv-card {
+                padding: 20px;
+            }
+            .pdv-card .label {
+                font-size: 1.2em;
+            }
+            .pdv-card .status {
+                font-size: 0.8em;
+            }
+            .footer {
+                font-size: 0.8em;
+                padding-top: 15px;
+                padding-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="splash-screen">
+        <div class="splash-icons">
+            <span>&#8640;</span>
+            <span>&#10226;</span>
+            <span>&#8644;</span>
+        </div>
+        <div class="splash-logo">SM 520</div>
+        <div class="splash-tagline">Gerenciamento Inteligente de PDVs</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="splash-progress-bar"></div>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1>Gerenciador de PDVs</h1>
+        <a href="/acesso-geral" class="btn-acesso-geral" id="btn-acesso-geral">⚙️ Acesso Geral (Comandos em Massa)</a>
+    </div>
+
+    <div class="container" id="pdv-container">
+        {% for pdv in pdvs %}
+        <a href="/pdv/{{ pdv.ip }}" class="pdv-card checking" data-ip="{{ pdv.ip }}">
+            <span class="label">{{ pdv.label }}</span>
+            <span class="status">Verificando...</span>
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="dashboard-insights">
+        <div class="insight-card">
+            <div class="count" id="online-count">0</div>
+            <div class="label">PDVs Online</div>
+        </div>
+        <div class="insight-card">
+            <div class="count" id="offline-count">0</div>
+            <div class="label">PDVs Offline</div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        SM 520 - Aracati - CE - &copy; 2025
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const splashScreen = document.getElementById('splash-screen');
+            const body = document.body;
+            const pdvCards = document.querySelectorAll('.pdv-card');
+            const onlineCountElement = document.getElementById('online-count');
+            const offlineCountElement = document.getElementById('offline-count');
+            const splashProgressBar = document.getElementById('splash-progress-bar');
+            const btnAcessoGeral = document.getElementById('btn-acesso-geral');
+
+            const hasVisitedBefore = localStorage.getItem('hasVisitedSM520Full');
+            const hasPingsRun = localStorage.getItem('hasPingsRun'); // Nova chave para controle do ping
+            const pageTransitionDuration = 300; // Duração da transição de fade (em ms)
+
+            // --- Gerenciamento da Splash Screen e Fade-in do Body ---
+            function showBodyAndHideSplash() {
+                splashScreen.classList.add('hidden');
+                splashScreen.addEventListener('transitionend', () => {
+                    splashScreen.style.display = 'none';
+                    body.classList.add('fade-in-page');
+                }, { once: true });
+            }
+
+            // --- Funções de Atualização dos Status (sem fetch) ---
+            // Esta função apenas atualiza os contadores e os cards com base nos dados do localStorage
+            function updatePdvDisplayFromLocalStorage() {
+                const storedPdvStatuses = JSON.parse(localStorage.getItem('pdvStatuses') || '[]');
+                let onlineCount = 0;
+                let offlineCount = 0;
+
+                // Primeiro, reinicializa todos os cards para 'Verificando...' se não houver dados no localStorage,
+                // ou para o estado anterior antes de aplicar os novos.
+                pdvCards.forEach(card => {
+                    card.classList.remove('online', 'offline');
+                    if (!storedPdvStatuses.length) { // Se não houver dados salvos, todos voltam para "Verificando..."
+                        card.classList.add('checking');
+                        card.querySelector('.status').textContent = 'Verificando...';
+                    }
+                });
+
+
+                storedPdvStatuses.forEach(statusInfo => {
+                    const card = document.querySelector(`.pdv-card[data-ip="${statusInfo.ip}"]`);
+                    if (card) {
+                        const statusSpan = card.querySelector('.status');
+                        card.classList.remove('checking'); // Remove o "Verificando" se houver um status real
+                        if (statusInfo.online) {
+                            card.classList.add('online');
+                            statusSpan.textContent = 'Online';
+                            onlineCount++;
+                        } else {
+                            card.classList.add('offline');
+                            statusSpan.textContent = 'Offline';
+                            offlineCount++;
+                        }
+                    }
+                });
+                onlineCountElement.textContent = onlineCount;
+                offlineCountElement.textContent = offlineCount;
+            }
+
+            // --- Lógica Inicial de Carregamento ---
+            if (!hasVisitedBefore) {
+                // Primeira visita: mostrar splash e rodar pings
+                body.style.visibility = 'hidden';
+                splashScreen.style.display = 'flex';
+                
+                const minSplashTime = 1000;
+                const startTime = Date.now();
+
+                fetch('/api/status/all')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(statuses => {
+                        // Salva os status no localStorage
+                        localStorage.setItem('pdvStatuses', JSON.stringify(statuses));
+                        localStorage.setItem('hasPingsRun', 'true'); // Marca que os pings foram executados
+
+                        updatePdvDisplayFromLocalStorage(); // Atualiza a exibição com os dados recém-buscados
+
+                        const elapsedTime = Date.now() - startTime;
+                        if (elapsedTime < minSplashTime) {
+                            setTimeout(showBodyAndHideSplash, minSplashTime - elapsedTime);
+                        } else {
+                            showBodyAndHideSplash();
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Erro ao buscar status dos PDVs:", error);
+                        const elapsedTime = Date.now() - startTime;
+                        if (elapsedTime < minSplashTime) {
+                            setTimeout(() => {
+                                showBodyAndHideSplash();
+                                alert('Erro ao carregar os PDVs. Verifique sua conexão.');
+                            }, minSplashTime - elapsedTime);
+                        } else {
+                            showBodyAndHideSplash();
+                            alert('Erro ao carregar os PDVs. Verifique sua conexão.');
+                        }
+                    });
+            } else {
+                // Já visitou antes: esconder splash e mostrar body (com ou sem pings)
+                splashScreen.style.display = 'none'; // Esconde a splash instantaneamente
+                body.classList.add('fade-in-page'); // Faz o body fade-in
+
+                if (hasPingsRun === 'true') {
+                    // Se os pings já rodaram nesta sessão, carregar do localStorage
+                    updatePdvDisplayFromLocalStorage();
+                } else {
+                    // Se não rodaram nesta sessão (ex: aba duplicada ou crash anterior), rodar agora
+                    // Os cards já estarão como "Verificando..." pelo template Jinja
+                    // E depois serão atualizados por updatePdvDisplayFromLocalStorage
+                    const minSplashTime = 0; // Não precisa de splash, apenas o fetch
+                    const startTime = Date.now();
+
+                    fetch('/api/status/all')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(statuses => {
+                            localStorage.setItem('pdvStatuses', JSON.stringify(statuses));
+                            localStorage.setItem('hasPingsRun', 'true'); // Marca que os pings foram executados
+                            updatePdvDisplayFromLocalStorage();
+                        })
+                        .catch(error => {
+                            console.error("Erro ao buscar status dos PDVs:", error);
+                            alert('Erro ao carregar os PDVs. Verifique sua conexão.');
+                        });
+                }
+            }
+
+            // --- Transição de Página com Fade-Out (Agora para cards e botão de acesso geral) ---
+            function handlePageTransition(event) {
+                event.preventDefault(); // Impede a navegação padrão imediatamente
+                const targetLink = this.href; // Captura o link de destino
+
+                document.body.classList.add('fade-out-page'); // Adiciona a classe de fade-out ao body
+
+                // Redireciona APÓS a duração da animação de saída
+                setTimeout(() => {
+                    window.location.href = targetLink;
+                }, pageTransitionDuration);
+            }
+
+            // Adiciona o event listener para todos os cards PDV
+            pdvCards.forEach(card => {
+                card.addEventListener('click', handlePageTransition);
+            });
+
+            // Adiciona o event listener para o botão de Acesso Geral
+            btnAcessoGeral.addEventListener('click', handlePageTransition);
+
+            // --- Resetar hasPingsRun e pdvStatuses no Fechamento/Atualização da Aba ---
+            // Isso garante que os pings rodarão novamente se o usuário fechar e reabrir a aba,
+            // ou der um hard refresh (F5).
+            window.addEventListener('beforeunload', () => {
+                localStorage.removeItem('hasPingsRun');
+                localStorage.removeItem('pdvStatuses'); // Também remove os status salvos
+            });
+        });
+    </script>
+</body>
+</html>

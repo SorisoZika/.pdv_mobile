@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso Geral</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            margin: 0;
+            padding: 15px;
+            /* Transição de entrada e saída para a página */
+            opacity: 0;
+            transition: opacity 0.3s ease-out; /* Duração e tipo de transição */
+        }
+
+        /* Classe para o body fade-in na entrada da página */
+        body.fade-in-page {
+            opacity: 1;
+        }
+
+        /* Classe para o body fade-out na saída da página */
+        body.fade-out-page {
+            opacity: 0;
+        }
+
+        .header { text-align: center; margin-bottom: 20px; }
+        a.back-link { color: #3498db; text-decoration: none; display: inline-block; margin-bottom: 20px; font-weight: bold; }
+        .pdv-list { list-style: none; padding: 0; margin: 0 0 20px 0; background-color: #34495e; border-radius: 8px; padding: 15px; min-height: 100px; }
+        .pdv-list li { padding: 10px; border-bottom: 1px solid #2c3e50; }
+        .pdv-list li:last-child { border-bottom: none; }
+        .pdv-list label { display: flex; align-items: center; font-size: 1.1em; cursor: pointer; }
+        .pdv-list input[type="checkbox"] { width: 20px; height: 20px; margin-right: 15px; }
+        .select-all { margin-bottom: 10px; font-weight: bold; }
+        .actions { display: flex; flex-direction: column; gap: 15px; }
+        .btn { padding: 20px; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; color: white; cursor: pointer; text-align: center; }
+        .btn:disabled { background-color: #7f8c8d; cursor: not-allowed; }
+        .btn-restart-app { background-color: #3498db; }
+        .btn-restart-machine { background-color: #27AE60; color: #2c3e50; }
+        #results-area { margin-top: 20px; background-color: #34495e; border-radius: 8px; padding: 15px; white-space: pre-wrap; font-family: monospace; max-height: 300px; overflow-y: auto; }
+
+        /* Estilos para a tela de loading */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex; /* Mantém flex para transição de opacidade */
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            color: white;
+            font-size: 1.5em;
+            flex-direction: column;
+            opacity: 0; /* Começa invisível */
+            visibility: hidden; /* Esconde para não atrapalhar o layout */
+            transition: opacity 0.3s ease-out, visibility 0.3s ease-out; /* Transição suave */
+        }
+        /* Classe para mostrar o overlay */
+        #loading-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        /* Classe para esconder o overlay */
+        #loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .spinner { border: 8px solid #f3f3f3; border-top: 8px solid #3498db; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="loading-overlay" class="hidden"> <div class="spinner"></div>
+        <span>Aguarde, enviando comandos...</span>
+    </div>
+
+    <a href="/" class="back-link" id="back-to-grid-link">&larr; Voltar para a Grade</a>
+    <div class="header"><h1>Comandos em Massa</h1></div>
+    
+    <div class="pdv-list">
+        <label class="select-all">
+            <input type="checkbox" onchange="toggleSelectAll(this.checked)">
+            Selecionar Todos
+        </label>
+        <ul id="pdv-checkbox-list">
+            {% for pdv in pdvs %}
+            <li data-ip="{{ pdv.ip }}" style="display: none;"> <label><input type="checkbox" name="pdv" value="{{ pdv.ip }}"> {{ pdv.label }}</label>
+            </li>
+            {% endfor %}
+            <li id="status-message">Verificando PDVs online...</li>
+        </ul>
+    </div>
+
+    <div class="actions">
+        <button class="btn btn-restart-app" onclick="executarComandoEmMassa('reiniciar_app')">🌀 Reiniciar App Gráfico (Selecionados)</button>
+        <button class="btn btn-restart-machine" onclick="executarComandoEmMassa('reiniciar_maquina')">🔄 Reiniciar Máquinas (Selecionados)</button>
+    </div>
+
+    <div id="results-area" style="display:none;"></div>
+
+    <script>
+        const PAGE_TRANSITION_DURATION = 300; // Duração da transição de fade (em ms)
+
+        function toggleSelectAll(checked) {
+            // Seleciona apenas os checkboxes que estão visíveis (ou seja, os que foram confirmados como online)
+            document.querySelectorAll('#pdv-checkbox-list li:not([style*="display: none"]) input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = checked;
+            });
+        }
+
+        // Script que busca os status e atualiza a lista dinamicamente
+        document.addEventListener('DOMContentLoaded', () => {
+            // Adiciona a classe para fazer a página principal aparecer suavemente
+            document.body.classList.add('fade-in-page');
+
+            const backLink = document.getElementById('back-to-grid-link');
+            
+            if (backLink) {
+                backLink.addEventListener('click', function(event) {
+                    event.preventDefault(); // Impede a navegação padrão imediatamente
+                    const targetLink = this.href; // Captura o link de destino
+
+                    document.body.classList.add('fade-out-page'); // Adiciona a classe de fade-out ao body
+
+                    // Redireciona APÓS a duração da animação de saída
+                    setTimeout(() => {
+                        window.location.href = targetLink;
+                    }, PAGE_TRANSITION_DURATION);
+                });
+            }
+
+            fetch('/api/status/all')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(statuses => {
+                    const list = document.getElementById('pdv-checkbox-list');
+                    const statusMessage = document.getElementById('status-message');
+                    let onlineCount = 0;
+
+                    statuses.forEach(statusInfo => {
+                        // Se o PDV estiver online, encontramos ele na lista e o exibimos
+                        if (statusInfo.online) {
+                            const listItem = list.querySelector(`li[data-ip="${statusInfo.ip}"]`);
+                            if (listItem) {
+                                listItem.style.display = 'block';
+                                onlineCount++;
+                            }
+                        }
+                    });
+
+                    // Remove a mensagem de "Verificando..." se houver PDVs online
+                    if (onlineCount > 0) {
+                        statusMessage.style.display = 'none';
+                    } else {
+                        statusMessage.textContent = 'Nenhum PDV online encontrado.';
+                    }
+                })
+                .catch(error => {
+                    // Trata erros de conexão com a API
+                    document.getElementById('status-message').textContent = 'Erro ao carregar status dos PDVs.';
+                    console.error("Erro ao buscar status dos PDVs:", error);
+                });
+        });
+
+        // Função para enviar os comandos em massa para os PDVs selecionados
+        async function executarComandoEmMassa(acao) {
+            const selectedCheckboxes = document.querySelectorAll('input[name="pdv"]:checked');
+            const ips = Array.from(selectedCheckboxes).map(cb => cb.value);
+
+            if (ips.length === 0) {
+                alert('Selecione pelo menos um PDV!');
+                return;
+            }
+
+            if (!confirm(`Tem certeza que deseja executar "${acao.replace('_', ' ')}" em ${ips.length} PDV(s)?`)) return;
+
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.classList.remove('hidden'); // Mostra o overlay
+            loadingOverlay.classList.add('visible');
+
+            const resultsArea = document.getElementById('results-area');
+            resultsArea.style.display = 'block';
+            resultsArea.innerHTML = 'Aguarde, processando...';
+
+            try {
+                const response = await fetch('/comando/em-massa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ips: ips, acao: acao })
+                });
+                const data = await response.json();
+                resultsArea.innerHTML = data.resultados.join('\n');
+            } catch (error) {
+                resultsArea.innerHTML = 'Erro de conexão com o servidor.';
+            } finally {
+                // Esconde o overlay após a operação
+                loadingOverlay.classList.remove('visible');
+                loadingOverlay.classList.add('hidden');
+                // O `transitionend` não é estritamente necessário aqui, pois a transição já está no CSS.
+            }
+        }
+    </script>
+</body>
+</html>
